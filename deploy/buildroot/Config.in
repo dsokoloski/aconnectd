@@ -1,0 +1,1 @@
+source "$BR2_EXTERNAL_aconnectd_PATH/package/aconnectd/Config.in"

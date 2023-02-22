@@ -1,0 +1,14 @@
+config BR2_PACKAGE_ACONNECTD
+	bool "aconnectd"
+	depends on BR2_INSTALL_LIBSTDCPP
+	depends on BR2_PACKAGE_SYSTEMD
+	depends on BR2_USE_MMU
+	select BR2_PACKAGE_ALSA_LIB
+	select BR2_PACKAGE_ALSA_LIB_RAWMIDI
+	select BR2_PACKAGE_ALSA_LIB_SEQ
+	help
+          ALSA aconnect manager.
+
+comment "aconnected is a C++17 application, please enable C++ under Toolchain"
+	depends on !BR2_INSTALL_LIBSTDCPP
+

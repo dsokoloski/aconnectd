@@ -1,0 +1,16 @@
+[Unit]
+Description=ALSA aconnect Manager
+After=rtpmidid.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/run/aconnectd/
+ExecStart=/usr/sbin/aconnectd
+Restart=on-failure
+RuntimeDirectory=aconnectd
+RuntimeDirectoryMode=0755
+
+[Install]
+WantedBy=network.target
