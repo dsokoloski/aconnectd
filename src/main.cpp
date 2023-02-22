@@ -1,5 +1,7 @@
 #include <string>
 #include <iostream>
+#include <vector>
+#include <map>
 
 #include <cstdio>
 #include <cctype>
@@ -21,6 +23,8 @@ using json = nlohmann::json;
 
 using namespace std;
 
+#include "aconnectd.h"
+
 static void acd_error(const char *file, int line, const char *function,
 	int err, const char *fmt, ...)
 {
@@ -29,13 +33,55 @@ static void acd_error(const char *file, int line, const char *function,
 	if (err == ENOENT) return;
 
 	va_start(arg, fmt);
-	fprintf(stderr, "ALSA lib %s:%i:(%s) ", file, line, function);
+	fprintf(stderr, "ALSA error: %s:%i:(%s) ", file, line, function);
 	vfprintf(stderr, fmt, arg);
 	if (err)
 		fprintf(stderr, ": %s", snd_strerror(err));
 	putc('\n', stderr);
 	va_end(arg);
 }
+
+// client 0: 'System' [type=kernel]
+//     0 'Timer           '
+//     1 'Announce        '
+// client 14: 'Midi Through' [type=kernel]
+//     0 'Midi Through Port-0'
+// client 16: 'Launchkey Mini' [type=kernel,card=0]
+//     0 'Launchkey Mini MIDI 1'
+// 	0: 128:2
+//     1 'Launchkey Mini MIDI 2'
+// client 128: 'rtpmidi DMS Keys' [type=user,pid=215]
+//     0 'Network         '
+//     1 'Nano - LKMk2 InControl'
+//     2 'Nano - LKMk2 MIDI1'
+// 	1: 16:0
+//     3 'Nano - SLMk2 MIDI1'
+//     4 'Nano - SLMk2 MIDI2'
+
+size_t acdClient::AddPorts(snd_seq_t *seq, snd_seq_client_info_t *cinfo) {
+	snd_seq_port_info_t *pinfo;
+	snd_seq_port_info_alloca(&pinfo);
+
+	snd_seq_port_info_set_port(pinfo, -1);
+	snd_seq_port_info_set_client(
+		pinfo,
+		snd_seq_client_info_get_client(cinfo)
+	);
+
+	while (snd_seq_query_next_port(seq, pinfo) >= 0) {
+		acdPort port(pinfo);
+
+		auto it = ports.insert(make_pair(port.id, port));
+
+		if (it.second == true) {
+			fprintf(stderr, "Inserted new port: %d: %s\n", port.id, port.name.c_str());
+		}
+	}
+
+	return ports.size();
+}
+
+static map<int, acdClient> acd_clients;
 
 static void acd_get_port(snd_seq_t *seq, snd_seq_client_info_t *cinfo,
 	snd_seq_port_info_t *pinfo, int count)
@@ -104,12 +150,13 @@ static void acd_get_subscribers(
 static void acd_get_subscribers(snd_seq_t *seq)
 {
 	int count;
-	snd_seq_port_info_t *pinfo;
-	snd_seq_client_info_t *cinfo;
 
+	snd_seq_client_info_t *cinfo;
 	snd_seq_client_info_alloca(&cinfo);
-	snd_seq_port_info_alloca(&pinfo);
 	snd_seq_client_info_set_client(cinfo, -1);
+
+	snd_seq_port_info_t *pinfo;
+	snd_seq_port_info_alloca(&pinfo);
 
 	while (snd_seq_query_next_client(seq, cinfo) >= 0) {
 		snd_seq_port_info_set_client(
@@ -138,6 +185,29 @@ static void acd_get_subscribers(snd_seq_t *seq)
 	}
 }
 
+static void acd_refresh(snd_seq_t *seq)
+{
+	acd_clients.clear();
+
+	snd_seq_client_info_t *cinfo;
+	snd_seq_client_info_alloca(&cinfo);
+	snd_seq_client_info_set_client(cinfo, -1);
+
+	while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+		acdClient client(cinfo);
+
+		auto it = acd_clients.insert(make_pair(client.id, client));
+
+		if (it.second == true) {
+			fprintf(stdout, "Inserted new client: %d: %s\n",
+				client.id, client.name.c_str()
+			);
+
+			it.first->second.AddPorts(seq, cinfo);
+		}
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	snd_seq_t *seq;
@@ -152,6 +222,8 @@ int main(int argc, char *argv[])
 	snd_lib_error_set_handler(acd_error);
 
 	acd_get_subscribers(seq);
+
+	acd_refresh(seq);
 
 	return 0;
 }
