@@ -132,13 +132,16 @@ size_t acdPort::AddSubscriptions(snd_seq_t *seq,
 			)
 		);
 
-		fprintf(stdout, "Added subscriptions: %d:%d -> %d:%d: %d",
+		fprintf(stdout, "Added subscriptions: %d:%d -> %d:%d: %d\n",
 			client.id, id,
 			addr->client, addr->port, type
 		);
 
 		count++;
 
+		snd_seq_query_subscribe_set_index(subs,
+			snd_seq_query_subscribe_get_index(subs) + 1
+		);
 	}
 
 	return count;
