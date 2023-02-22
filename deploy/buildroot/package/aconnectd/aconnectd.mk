@@ -16,7 +16,7 @@ ACONNECTD_DEPENDENCIES = host-pkgconf host-cmake
 ACONNECTD_INSTALL_STAGING = YES
 
 define ACONNECTD_INSTALL_INIT_SYSTEMD
-	$(INSTALL) -D -m 644 $(@D)/systemd/aconnectd.service \
+	$(INSTALL) -D -m 644 $(@D)/deploy/systemd/aconnectd.service \
 		$(TARGET_DIR)/usr/lib/systemd/system/aconnectd.service
 endef
 
