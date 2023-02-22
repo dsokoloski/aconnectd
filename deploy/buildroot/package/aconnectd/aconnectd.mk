@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-ACONNECTD_VERSION = master
+ACONNECTD_VERSION = HEAD
 ACONNECTD_SITE = git@git.sokoloski.ca:buildroot-rtpmidi.git
 ACONNECTD_SITE_METHOD=git
 ACONNECTD_GIT_SUBMODULES = NO
