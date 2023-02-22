@@ -25,6 +25,10 @@ using namespace std;
 
 #include "aconnectd.h"
 
+static int acd_my_id = -1;
+static acdSubAddrMap acd_sub_addr_map;
+static acdSubMap acd_sub_map;
+
 static void acd_error(const char *file, int line, const char *function,
 	int err, const char *fmt, ...)
 {
@@ -58,7 +62,11 @@ static void acd_error(const char *file, int line, const char *function,
 //     3 'Nano - SLMk2 MIDI1'
 //     4 'Nano - SLMk2 MIDI2'
 
-size_t acdClient::AddPorts(snd_seq_t *seq, snd_seq_client_info_t *cinfo) {
+size_t acdClient::AddPorts(const acdClient &client,
+	snd_seq_t *seq, snd_seq_client_info_t *cinfo) {
+
+	ports.clear();
+
 	snd_seq_port_info_t *pinfo;
 	snd_seq_port_info_alloca(&pinfo);
 
@@ -69,12 +77,14 @@ size_t acdClient::AddPorts(snd_seq_t *seq, snd_seq_client_info_t *cinfo) {
 	);
 
 	while (snd_seq_query_next_port(seq, pinfo) >= 0) {
-		acdPort port(pinfo);
+		acdPort port(client, pinfo);
 
 		auto it = ports.insert(make_pair(port.id, port));
 
 		if (it.second == true) {
-			fprintf(stderr, "Inserted new port: %d: %s\n", port.id, port.name.c_str());
+			fprintf(stdout, "Inserted new port: %d: %s\n", port.id, port.name.c_str());
+
+			it.first->second.AddSubscriptions(seq, pinfo);
 		}
 	}
 
@@ -82,6 +92,57 @@ size_t acdClient::AddPorts(snd_seq_t *seq, snd_seq_client_info_t *cinfo) {
 }
 
 static map<int, acdClient> acd_clients;
+
+size_t acdPort::AddSubscriptions(snd_seq_t *seq, snd_seq_port_info_t *pinfo)
+{
+	snd_seq_query_subscribe_t *subs;
+	snd_seq_query_subscribe_alloca(&subs);
+
+	snd_seq_query_subscribe_set_root(
+		subs,
+		snd_seq_port_info_get_addr(pinfo)
+	);
+
+	size_t count = 0;
+	count += AddSubscriptions(seq, subs, SND_SEQ_QUERY_SUBS_READ);
+	count += AddSubscriptions(seq, subs, SND_SEQ_QUERY_SUBS_WRITE);
+
+	return count;
+}
+
+size_t acdPort::AddSubscriptions(snd_seq_t *seq,
+	snd_seq_query_subscribe_t *subs, snd_seq_query_subs_type_t type)
+{
+	size_t count = 0;
+	snd_seq_query_subscribe_set_type(subs, type);
+	snd_seq_query_subscribe_set_index(subs, 0);
+
+	while (snd_seq_query_port_subscribers(seq, subs) >= 0) {
+		const snd_seq_addr_t *addr;
+
+		addr = snd_seq_query_subscribe_get_addr(subs);
+
+		acd_sub_addr_map.push_back(
+			make_pair(
+				acdSubAddr(client.id, id),
+				make_pair(
+					acdSubAddr(addr->client, addr->port),
+					type
+				)
+			)
+		);
+
+		fprintf(stdout, "Added subscriptions: %d:%d -> %d:%d: %d",
+			client.id, id,
+			addr->client, addr->port, type
+		);
+
+		count++;
+
+	}
+
+	return count;
+}
 
 static void acd_get_port(snd_seq_t *seq, snd_seq_client_info_t *cinfo,
 	snd_seq_port_info_t *pinfo, int count)
@@ -189,11 +250,17 @@ static void acd_refresh(snd_seq_t *seq)
 {
 	acd_clients.clear();
 
+	acd_sub_addr_map.clear();
+	acd_sub_map.clear();
+
 	snd_seq_client_info_t *cinfo;
 	snd_seq_client_info_alloca(&cinfo);
 	snd_seq_client_info_set_client(cinfo, -1);
 
 	while (snd_seq_query_next_client(seq, cinfo) >= 0) {
+
+		if (snd_seq_client_info_get_client(cinfo) == acd_my_id) continue;
+
 		acdClient client(cinfo);
 
 		auto it = acd_clients.insert(make_pair(client.id, client));
@@ -203,7 +270,72 @@ static void acd_refresh(snd_seq_t *seq)
 				client.id, client.name.c_str()
 			);
 
-			it.first->second.AddPorts(seq, cinfo);
+			it.first->second.AddPorts(it.first->second, seq, cinfo);
+		}
+	}
+}
+
+static void acd_resolve_subscriptions(void)
+{
+	for (auto &it_sub : acd_sub_addr_map) {
+
+		auto it_client_src = acd_clients.find(it_sub.first.first);
+
+		if (it_client_src == acd_clients.end()) {
+			fprintf(stderr, "Subscription from invalid source client: %d\n",
+				it_sub.first.first
+			);
+			continue;
+		}
+
+		auto it_port_src = (*it_client_src).second.ports.find(it_sub.first.second);
+
+		if (it_port_src == (*it_client_src).second.ports.end()) {
+			fprintf(stderr, "Subscription from invalid source address: %d:%d\n",
+				it_sub.first.first, it_sub.first.second
+			);
+			continue;
+		}
+
+		auto it_client_dst = acd_clients.find(it_sub.second.first.first);
+
+		if (it_client_dst == acd_clients.end()) {
+			fprintf(stderr, "Subscription from invalid destination client: %d\n",
+				it_sub.second.first.first
+			);
+			continue;
+		}
+
+		auto it_port_dst = (*it_client_dst).second.ports.find(it_sub.second.first.second);
+
+		if (it_port_dst == (*it_client_dst).second.ports.end()) {
+			fprintf(stderr, "Subscription from invalid source address: %d:%d\n",
+				it_sub.second.first.first, it_sub.second.first.second
+			);
+			continue;
+		}
+
+		acdSubscription subscription(
+			(*it_client_src).second, (*it_port_src).second,
+			(*it_client_dst).second, (*it_port_dst).second,
+			(snd_seq_query_subs_type_t)it_sub.second.second
+		);
+
+		auto it = acd_sub_map.insert(
+			make_pair(
+				make_pair(
+					(*it_client_src).second.name + ":" + (*it_port_src).second.name,
+					(*it_client_dst).second.name + ":" + (*it_port_dst).second.name
+				),
+				subscription
+			)
+		);
+
+		if (it.second == true) {
+			fprintf(stdout, "Resolved subscription: %s -> %s\n",
+				it.first->first.first.c_str(),
+				it.first->first.second.c_str()
+			);
 		}
 	}
 }
@@ -211,19 +343,22 @@ static void acd_refresh(snd_seq_t *seq)
 int main(int argc, char *argv[])
 {
 	snd_seq_t *seq;
-	//snd_seq_port_subscribe_t *subs;
-	//snd_seq_addr_t sender, dest;
 
 	if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
-		fprintf(stderr, "%s: can't open sequencer\n", __PRETTY_FUNCTION__);
+		fprintf(stderr, "Error opening sequencer\n");
 		return 1;
 	}
 
 	snd_lib_error_set_handler(acd_error);
 
+	acd_my_id = snd_seq_client_id(seq);
+
 	acd_get_subscribers(seq);
 
 	acd_refresh(seq);
+	acd_resolve_subscriptions();
+
+	snd_seq_close(seq);
 
 	return 0;
 }

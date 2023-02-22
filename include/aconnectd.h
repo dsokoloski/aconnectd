@@ -18,6 +18,9 @@
 //     3 'Nano - SLMk2 MIDI1'
 //     4 'Nano - SLMk2 MIDI2'
 
+typedef pair<int, int> acdSubAddr;
+typedef vector<pair<acdSubAddr, pair<acdSubAddr, int>>> acdSubAddrMap;
+
 class acdPort;
 class acdClient
 {
@@ -29,7 +32,8 @@ public:
 		id(snd_seq_client_info_get_client(cinfo)),
 		name(snd_seq_client_info_get_name(cinfo)) { }
 
-	size_t AddPorts(snd_seq_t *seq, snd_seq_client_info_t *cinfo);
+	size_t AddPorts(const acdClient &client,
+		snd_seq_t *seq, snd_seq_client_info_t *cinfo);
 
 	map<int, acdPort> ports;
 };
@@ -38,24 +42,38 @@ class acdSubscription;
 class acdPort
 {
 public:
+	const acdClient &client;
 	int id;
 	string name;
 
-	acdPort(snd_seq_port_info_t *pinfo) :
+	acdPort(const acdClient &client, snd_seq_port_info_t *pinfo) :
+		client(client),
 		id(snd_seq_port_info_get_port(pinfo)),
 		name(snd_seq_port_info_get_name(pinfo)) { }
 
-	vector<acdSubscription> subscriptions;
+	size_t AddSubscriptions(snd_seq_t *seq, snd_seq_port_info_t *pinfo);
+	size_t AddSubscriptions(snd_seq_t *seq,
+		snd_seq_query_subscribe_t *subs, snd_seq_query_subs_type_t type);
 };
+
+typedef map<pair<string, string>, acdSubscription> acdSubMap;
 
 class acdSubscription
 {
 public:
+	const acdClient &client_src;
+	const acdPort &port_src;
+	const acdClient &client_dst;
+	const acdPort &port_dst;
 	snd_seq_query_subs_type_t type;
-	const acdClient &client;
-	const acdPort &port;
 
-	acdSubscription(const snd_seq_addr_t *addr);
+	acdSubscription(
+		const acdClient &client_src, const acdPort &port_src,
+		const acdClient &client_dst, const acdPort &port_dst,
+		snd_seq_query_subs_type_t type) :
+		client_src(client_src), port_src(port_src),
+		client_dst(client_dst), port_dst(port_dst),
+		type(type) { }
 };
 
 #endif // _ACONNECTD_H
