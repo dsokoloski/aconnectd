@@ -5,7 +5,7 @@
 ################################################################################
 
 ACONNECTD_VERSION = HEAD
-ACONNECTD_SITE = git@git.sokoloski.ca:buildroot-rtpmidi.git
+ACONNECTD_SITE = git@git.sokoloski.ca:aconnectd.git
 ACONNECTD_SITE_METHOD=git
 ACONNECTD_GIT_SUBMODULES = NO
 ACONNECTD_LICENSE = GPL-3
