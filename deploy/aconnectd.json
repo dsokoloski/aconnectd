@@ -26,26 +26,26 @@
             "dst_port": "Mac Pro - LKMk2 InControl"
         },
         {
-            "src_client": "SLMk2",
-            "src_port": "SLMk2 MIDI 1",
+            "src_client": "SL MkII",
+            "src_port": "SL MkII MIDI 1",
             "dst_client": "rtpmidi DMS Keys",
             "dst_port": "Nano - SLMk2 MIDI1"
         },
         {
-            "src_client": "SLMk2",
-            "src_port": "SLMk2 MIDI 2",
+            "src_client": "SL MkII",
+            "src_port": "SL MkII MIDI 2",
             "dst_client": "rtpmidi DMS Keys",
             "dst_port": "Nano - SLMk2 MIDI2"
         },
         {
-            "src_client": "SLMk2",
-            "src_port": "SLMk2 MIDI 1",
+            "src_client": "SL MkII",
+            "src_port": "SL MkII MIDI 1",
             "dst_client": "rtpmidi DMS Keys",
             "dst_port": "Mac Pro - SLMk2 MIDI1"
         },
         {
-            "src_client": "SLMk2",
-            "src_port": "SLMk2 MIDI 2",
+            "src_client": "SL MkII",
+            "src_port": "SL MkII MIDI 2",
             "dst_client": "rtpmidi DMS Keys",
             "dst_port": "Mac Pro - SLMk2 MIDI2"
         }
