@@ -562,6 +562,8 @@ int main(int argc, char *argv[])
                 tspec_sigwait = { acd_config.refresh_ttl, 0 };
             }
             else if (sid == SIGINT || sid == SIGTERM) {
+                acd_refresh(seq);
+                acd_resolve_subscriptions();
                 fprintf(stdout, "Terminating...\n");
                 for (auto &it : acd_sub_map)
                     acdSubscription::Remove(seq, it.second);
