@@ -511,6 +511,8 @@ int main(int argc, char *argv[])
         sigaddset(&sigset, SIGTERM);
     }
 
+    rc = 0;
+
     do {
         if (time(NULL) >= last_refresh + acd_config.refresh_ttl) {
             acd_refresh(seq);
@@ -549,11 +551,14 @@ int main(int argc, char *argv[])
             }
 
             if (sid == SIGHUP) {
+                fprintf(stdout, "Reloading...\n");
                 acd_config.Load("/etc/aconnectd.json");
                 tspec_sigwait = { acd_config.refresh_ttl, 0 };
             }
-            else if (sid == SIGINT || sid == SIGTERM)
+            else if (sid == SIGINT || sid == SIGTERM) {
+                fprintf(stdout, "Terminating...\n");
                 terminate = true;
+            }
         }
     }
     while (! terminate);
