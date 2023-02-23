@@ -487,7 +487,7 @@ int main(int argc, char *argv[])
             return 0;
         case 'd':
             terminate = false;
-            if (daemon(1, 0) != 0) {
+            if (daemon(1, 1) != 0) {
                 fprintf(stderr, "daemon: %s\n", strerror(errno));
                 return 1;
             }

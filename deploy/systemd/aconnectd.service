@@ -3,7 +3,7 @@ Description=ALSA aconnect Manager
 After=rtpmidid.service
 
 [Service]
-Type=simple
+Type=forking
 User=root
 Group=root
 WorkingDirectory=/run/aconnectd/
