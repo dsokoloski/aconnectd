@@ -228,11 +228,11 @@ bool acdSubscription::GetAddress(
             if (port != it_port.second.name) continue;
 
             const string a(
-                to_string(it_client.first) + "/" + to_string(it_port.first)
+                to_string(it_client.first) + ":" + to_string(it_port.first)
             );
 
             if (snd_seq_parse_address(seq, &addr, a.c_str()) < 0) {
-                fprintf(stderr, "Invalid address: %s:%s (%d:%d)\n",
+                fprintf(stderr, "Invalid address: %s/%s (%d:%d)\n",
                     client.c_str(), port.c_str(), it_client.first, it_port.first
                 );
 
@@ -254,13 +254,13 @@ bool acdSubscription::GetAddress(snd_seq_t *seq,
     switch (atype) {
     case atSRC:
         a = to_string(subscription.src_client.id) +
-            "/" + to_string(subscription.src_port.id);
+            ":" + to_string(subscription.src_port.id);
         break;
 
     case atDST:
     default:
         a = to_string(subscription.dst_client.id) +
-            "/" + to_string(subscription.dst_port.id);
+            ":" + to_string(subscription.dst_port.id);
         break;
     }
 
