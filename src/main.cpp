@@ -65,6 +65,10 @@ void acdConfig::Load(const string &filename)
             bool exclusive = false;
 
             try {
+                if (! it["enabled"].get<bool>()) continue;
+            } catch (...) { }
+
+            try {
                 string mode = it["convert_time_mode"].get<string>();
                 if (mode == "real") {
                     convert_time = 1;
