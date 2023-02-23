@@ -533,6 +533,7 @@ int main(int argc, char *argv[])
             }
 
             last_refresh = time(NULL);
+            fflush(stdout);
         }
 
         if (! terminate) {
