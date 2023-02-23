@@ -17,13 +17,13 @@
             "src_client": "Launchkey Mini",
             "src_port": "Launchkey Mini MIDI 1",
             "dst_client": "rtpmidi DMS Keys",
-            "dst_port": "MacPro - LKMk2 MIDI1"
+            "dst_port": "Mac Pro - LKMk2 MIDI1"
         },
         {
             "src_client": "Launchkey Mini",
             "src_port": "Launchkey Mini MIDI 2",
             "dst_client": "rtpmidi DMS Keys",
-            "dst_port": "MacPro - LKMk2 InControl"
+            "dst_port": "Mac Pro - LKMk2 InControl"
         },
         {
             "src_client": "SLMk2",
@@ -41,13 +41,13 @@
             "src_client": "SLMk2",
             "src_port": "SLMk2 MIDI 1",
             "dst_client": "rtpmidi DMS Keys",
-            "dst_port": "MacPro - SLMk2 MIDI1"
+            "dst_port": "Mac Pro - SLMk2 MIDI1"
         },
         {
             "src_client": "SLMk2",
             "src_port": "SLMk2 MIDI 2",
             "dst_client": "rtpmidi DMS Keys",
-            "dst_port": "MacPro - SLMk2 MIDI2"
+            "dst_port": "Mac Pro - SLMk2 MIDI2"
         }
     ]
 }
