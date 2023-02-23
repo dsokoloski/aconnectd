@@ -563,14 +563,13 @@ int main(int argc, char *argv[])
             }
             else if (sid == SIGINT || sid == SIGTERM) {
                 fprintf(stdout, "Terminating...\n");
+                for (auto &it : acd_sub_map)
+                    acdSubscription::Remove(seq, it.second);
                 terminate = true;
             }
         }
     }
     while (! terminate);
-
-    for (auto &it : acd_sub_map)
-        acdSubscription::Remove(seq, it.second);
 
     snd_seq_close(seq);
 
