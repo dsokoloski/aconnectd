@@ -529,6 +529,8 @@ int main(int argc, char *argv[])
                 if (it_patch == acd_config.patches.end())
                     acdSubscription::Remove(seq, it.second);
             }
+
+            last_refresh = time(NULL);
         }
 
         if (! terminate) {
