@@ -8,6 +8,7 @@ User=root
 Group=root
 WorkingDirectory=/run/aconnectd/
 ExecStart=/usr/sbin/aconnectd --daemon
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RuntimeDirectory=aconnectd
 RuntimeDirectoryMode=0755
