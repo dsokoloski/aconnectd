@@ -25,12 +25,20 @@ public:
     const string src_port;
     const string dst_client;
     const string dst_port;
+    int queue;
+    int convert_real;
+    int convert_time;
+    bool exclusive;
 
     acdPatch(
         const string &src_client, const string &src_port,
-        const string &dst_client, const string &dst_port) :
+        const string &dst_client, const string &dst_port,
+        int queue, int convert_real, int convert_time,
+        bool exclusive) :
         src_client(src_client), src_port(src_port),
-        dst_client(dst_client), dst_port(dst_port) { }
+        dst_client(dst_client), dst_port(dst_port),
+        queue(queue), convert_real(convert_real), convert_time(convert_time),
+        exclusive(exclusive) { }
 
     inline void MakeKey(pair<string, string> &key) const {
         key.first = src_client + "/" + src_port;

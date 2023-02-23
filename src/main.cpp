@@ -11,6 +11,8 @@
 #include <cerrno>
 #include <cstdarg>
 #include <clocale>
+#include <csignal>
+#include <ctime>
 
 #include <getopt.h>
 
@@ -57,11 +59,35 @@ void acdConfig::Load(const string &filename)
         patches.clear();
 
         for (auto &it : j["patches"]) {
+            int queue = 0;
+            int convert_real = 0;
+            int convert_time = 0;
+            bool exclusive = false;
+
+            try {
+                string mode = it["convert_time_mode"].get<string>();
+                if (mode == "real") {
+                    convert_time = 1;
+                    convert_real = 1;
+                }
+                else if (mode == "tick") {
+                    convert_time = 1;
+                    convert_real = 0;
+                }
+
+                queue = it["convert_time_queue"].get<int>();
+            } catch (...) { }
+
+            try {
+                exclusive = it["exclusive"].get<bool>();
+            } catch (...) { }
+
             acdPatch patch(
                 it["src_client"].get<string>(),
                 it["src_port"].get<string>(),
                 it["dst_client"].get<string>(),
-                it["dst_port"].get<string>()
+                it["dst_port"].get<string>(),
+                queue, convert_real, convert_time, exclusive
             );
 
             pair<string, string> key;
@@ -256,12 +282,10 @@ bool acdSubscription::Add(snd_seq_t *seq, const acdPatch &patch)
     snd_seq_port_subscribe_t *sub;
     snd_seq_port_subscribe_alloca(&sub);
 
-    int queue = 0, convert_time = 0, convert_real = 0, exclusive = 0;
-
-    snd_seq_port_subscribe_set_queue(sub, queue);
-    snd_seq_port_subscribe_set_exclusive(sub, exclusive);
-    snd_seq_port_subscribe_set_time_update(sub, convert_time);
-    snd_seq_port_subscribe_set_time_real(sub, convert_real);
+    snd_seq_port_subscribe_set_queue(sub, patch.queue);
+    snd_seq_port_subscribe_set_exclusive(sub, patch.exclusive);
+    snd_seq_port_subscribe_set_time_update(sub, patch.convert_time);
+    snd_seq_port_subscribe_set_time_real(sub, patch.convert_real);
 
     if (acdSubscription::Execute(seq, sub, src, dst, etSUBSCRIBE)) {
         pair<string, string> key;
@@ -438,26 +462,103 @@ int main(int argc, char *argv[])
 
     acd_my_id = snd_seq_client_id(seq);
 
-    acd_refresh(seq);
-    acd_resolve_subscriptions();
+    bool terminate = true;
 
-    for (auto &it : acd_config.patches) {
-        auto it_sub = acd_sub_map.find(it.first);
+    static const struct option acd_options[] = {
+        { "help", 0, NULL, 'h' },
+        { "daemon", 0, NULL, 'd' },
 
-        if (it_sub == acd_sub_map.end())
-            acdSubscription::Add(seq, it.second);
+        { NULL, 0, NULL, 0 },
+    };
+
+    int rc = 0;
+
+    while (true) {
+        if ((rc = getopt_long(argc, argv, "dh", acd_options, NULL)) == -1) break;
+
+        switch (rc) {
+        case 0:
+            break;
+        case '?':
+            fprintf(stderr, "Try `--help' for more information.\n");
+            return 1;
+        case 'h':
+            fprintf(stdout, "%s [-d, --daemon]\n", argv[0]);
+            return 0;
+        case 'd':
+            terminate = false;
+            if (daemon(1, 0) != 0) {
+                fprintf(stderr, "daemon: %s\n", strerror(errno));
+                return 1;
+            }
+            break;
+        }
     }
 
-    for (auto &it : acd_sub_map) {
-        auto it_patch = acd_config.patches.find(it.first);
+    time_t last_refresh = 0;
 
-        if (it_patch == acd_config.patches.end())
-            acdSubscription::Remove(seq, it.second);
+    sigset_t sigset;
+    struct timespec tspec_sigwait = { acd_config.refresh_ttl, 0 };
+
+    if (! terminate) {
+        sigfillset(&sigset);
+        sigdelset(&sigset, SIGQUIT);
+        sigprocmask(SIG_BLOCK, &sigset, NULL);
+
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGHUP);
+        sigaddset(&sigset, SIGINT);
+        sigaddset(&sigset, SIGTERM);
     }
+
+    do {
+        if (time(NULL) >= last_refresh + acd_config.refresh_ttl) {
+            acd_refresh(seq);
+            acd_resolve_subscriptions();
+
+            for (auto &it : acd_config.patches) {
+                auto it_sub = acd_sub_map.find(it.first);
+
+                if (it_sub == acd_sub_map.end())
+                    acdSubscription::Add(seq, it.second);
+            }
+
+            for (auto &it : acd_sub_map) {
+                auto it_patch = acd_config.patches.find(it.first);
+
+                if (it_patch == acd_config.patches.end())
+                    acdSubscription::Remove(seq, it.second);
+            }
+        }
+
+        if (! terminate) {
+            int sid;
+            siginfo_t si;
+
+            if ((sid = sigtimedwait(&sigset, &si, &tspec_sigwait)) < 0) {
+                if (errno == EAGAIN || errno == EINTR) {
+                    sleep(1);
+                    continue;
+                }
+                rc = -1;
+                terminate = true;
+                fprintf(stderr, "sigwaitinfo: %s\n", strerror(errno));
+                break;
+            }
+
+            if (sid == SIGHUP) {
+                acd_config.Load("/etc/aconnectd.json");
+                tspec_sigwait = { acd_config.refresh_ttl, 0 };
+            }
+            else if (sid == SIGINT || sid == SIGTERM)
+                terminate = true;
+        }
+    }
+    while (! terminate);
 
     snd_seq_close(seq);
 
-    return 0;
+    return rc;
 }
 
 // vi: expandtab shiftwidth=4 softtabstop=4 tabstop=4
