@@ -12,3 +12,4 @@ pkg_check_modules(ALSA REQUIRED alsa)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_subdirectory(src)
+add_subdirectory(deploy)
