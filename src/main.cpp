@@ -554,6 +554,7 @@ int main(int argc, char *argv[])
             if (sid == SIGHUP) {
                 fprintf(stdout, "Reloading...\n");
                 acd_config.Load("/etc/aconnectd.json");
+                last_refresh = 0;
                 tspec_sigwait = { acd_config.refresh_ttl, 0 };
             }
             else if (sid == SIGINT || sid == SIGTERM) {
@@ -563,6 +564,9 @@ int main(int argc, char *argv[])
         }
     }
     while (! terminate);
+
+    for (auto &it : acd_sub_map)
+        acdSubscription::Remove(seq, it.second);
 
     snd_seq_close(seq);
 
