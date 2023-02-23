@@ -343,7 +343,7 @@ bool acdSubscription::Execute(
 
     case etUNSUBSCRIBE:
     default:
-        if (snd_seq_subscribe_port(seq, sub) < 0) {
+        if (snd_seq_unsubscribe_port(seq, sub) < 0) {
             fprintf(stderr, "Failed to unsubscribe: %s\n", snd_strerror(errno));
             return false;
         }
