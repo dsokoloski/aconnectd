@@ -33,8 +33,8 @@ public:
         dst_client(dst_client), dst_port(dst_port) { }
 
     inline void MakeKey(pair<string, string> &key) const {
-        key.first = src_client + ":" + src_port;
-        key.second = dst_client + ":" + dst_port;
+        key.first = src_client + "/" + src_port;
+        key.second = dst_client + "/" + dst_port;
     }
 };
 
@@ -107,8 +107,8 @@ public:
         type(type) { }
 
     inline void MakeKey(pair<string, string> &key) const {
-        key.first = src_client.name + ":" + src_port.name;
-        key.second = dst_client.name + ":" + dst_port.name;
+        key.first = src_client.name + "/" + src_port.name;
+        key.second = dst_client.name + "/" + dst_port.name;
     }
 
     enum AddrType {
