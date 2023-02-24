@@ -30,6 +30,11 @@ using namespace std;
 
 static acdConfig acd_config;
 
+static acdSubAddrMap acd_sub_addr_map;
+static acdSubMap acd_sub_map;
+
+static map<int, acdClient> acd_clients;
+
 void acdConfig::Load(const string &filename)
 {
     json j;
@@ -100,29 +105,6 @@ void acdConfig::Load(const string &filename)
     } catch (...) { }
 }
 
-static acdSubAddrMap acd_sub_addr_map;
-static acdSubMap acd_sub_map;
-
-static void acd_error(
-    const char *file __attribute__((unused)),
-    int line __attribute__((unused)), const char *function,
-    int ecode, const char *fmt, ...)
-{
-    va_list arg;
-
-//    if (ecode == ENOENT) return;
-
-    va_start(arg, fmt);
-
-    fprintf(stderr, "ALSA error: %s: ", function);
-    vfprintf(stderr, fmt, arg);
-    if (ecode)
-        fprintf(stderr, ": %s", snd_strerror(ecode));
-    putc('\n', stderr);
-
-    va_end(arg);
-}
-
 size_t acdClient::AddPorts(const acdClient &client,
     snd_seq_t *seq, snd_seq_client_info_t *cinfo) {
 
@@ -155,8 +137,6 @@ size_t acdClient::AddPorts(const acdClient &client,
 
     return ports.size();
 }
-
-static map<int, acdClient> acd_clients;
 
 size_t acdPort::AddSubscriptions(snd_seq_t *seq, snd_seq_port_info_t *pinfo)
 {
@@ -359,6 +339,23 @@ bool acdSubscription::Execute(
     }
 
     return true;
+}
+
+static void acd_error(
+    const char *file __attribute__((unused)),
+    int line __attribute__((unused)), const char *function,
+    int ecode, const char *format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+
+    fprintf(stderr, "ALSA error: %s: ", function);
+    vfprintf(stderr, format, arg);
+    if (ecode)
+        fprintf(stderr, ": %s", snd_strerror(ecode));
+    putc('\n', stderr);
+
+    va_end(arg);
 }
 
 static void acd_refresh(snd_seq_t *seq)
