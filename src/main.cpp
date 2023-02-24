@@ -28,8 +28,6 @@ using namespace std;
 
 #include "aconnectd.h"
 
-static int acd_my_id = -1;
-
 static acdConfig acd_config;
 
 void acdConfig::Load(const string &filename)
@@ -105,19 +103,23 @@ void acdConfig::Load(const string &filename)
 static acdSubAddrMap acd_sub_addr_map;
 static acdSubMap acd_sub_map;
 
-static void acd_error(const char *file, int line, const char *function,
-    int err, const char *fmt, ...)
+static void acd_error(
+    const char *file __attribute__((unused)),
+    int line __attribute__((unused)), const char *function,
+    int ecode, const char *fmt, ...)
 {
     va_list arg;
 
-    if (err == ENOENT) return;
+//    if (ecode == ENOENT) return;
 
     va_start(arg, fmt);
-    fprintf(stderr, "ALSA error: %s:%i:(%s) ", file, line, function);
+
+    fprintf(stderr, "ALSA error: %s: ", function);
     vfprintf(stderr, fmt, arg);
-    if (err)
-        fprintf(stderr, ": %s", snd_strerror(err));
+    if (ecode)
+        fprintf(stderr, ": %s", snd_strerror(ecode));
     putc('\n', stderr);
+
     va_end(arg);
 }
 
@@ -141,7 +143,11 @@ size_t acdClient::AddPorts(const acdClient &client,
         auto it = ports.insert(make_pair(port.id, port));
 
         if (it.second == true) {
-            fprintf(stdout, "Inserted port: %d: %s\n", port.id, port.name.c_str());
+            if (acd_config.verbose) {
+                fprintf(stdout, "Inserted port: %d: %s\n",
+                    port.id, port.name.c_str()
+                );
+            }
 
             it.first->second.AddSubscriptions(seq, pinfo);
         }
@@ -191,11 +197,13 @@ size_t acdPort::AddSubscriptions(snd_seq_t *seq,
             )
         );
 
-        fprintf(stdout, "Inserted subscription: %d:%d %s %d:%d: %d\n",
-            client.id, id,
-            (type == SND_SEQ_QUERY_SUBS_READ) ? "->" : "<-",
-            addr->client, addr->port, type
-        );
+        if (acd_config.verbose) {
+            fprintf(stdout, "Inserted subscription: %d:%d %s %d:%d: %d\n",
+                client.id, id,
+                (type == SND_SEQ_QUERY_SUBS_READ) ? "->" : "<-",
+                addr->client, addr->port, type
+            );
+        }
 
         count++;
 
@@ -366,16 +374,19 @@ static void acd_refresh(snd_seq_t *seq)
 
     while (snd_seq_query_next_client(seq, cinfo) >= 0) {
 
-        if (snd_seq_client_info_get_client(cinfo) == acd_my_id) continue;
+        if (snd_seq_client_info_get_client(
+            cinfo) == acd_config.my_id) continue;
 
         acdClient client(cinfo);
 
         auto it = acd_clients.insert(make_pair(client.id, client));
 
         if (it.second == true) {
-            fprintf(stdout, "Inserted client: %d: %s\n",
-                client.id, client.name.c_str()
-            );
+            if (acd_config.verbose) {
+                fprintf(stdout, "Inserted client: %d: %s\n",
+                    client.id, client.name.c_str()
+                );
+            }
 
             it.first->second.AddPorts(it.first->second, seq, cinfo);
         }
@@ -437,48 +448,33 @@ static void acd_resolve_subscriptions(void)
 
         if (it.second == true &&
             it_sub.second.second == SND_SEQ_QUERY_SUBS_READ) {
-            fprintf(stdout, "Resolved subscription: %s -> %s\n",
-                it.first->first.first.c_str(),
-                it.first->first.second.c_str()
-            );
+            if (acd_config.verbose) {
+                fprintf(stdout, "Resolved subscription: %s -> %s\n",
+                    it.first->first.first.c_str(),
+                    it.first->first.second.c_str()
+                );
+            }
         }
     }
 }
 
 int main(int argc, char *argv[])
 {
-    acd_config.Load("/etc/aconnectd.json");
-
-    snd_seq_t *seq;
-
-    if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0) {
-        fprintf(stderr, "Error opening sequencer\n");
-        return 1;
-    }
-
-    snd_lib_error_set_handler(acd_error);
-
-    if (snd_seq_set_client_name(seq, "aconnectd") < 0) {
-        snd_seq_close(seq);
-        fprintf(stderr, "Error setting client name.\n");
-        return 1;
-    }
-
-    acd_my_id = snd_seq_client_id(seq);
-
+    int rc = 0;
     bool terminate = true;
+    string config_file("/etc/aconnectd.json");
 
     static const struct option acd_options[] = {
         { "help", 0, NULL, 'h' },
+        { "config", 1, NULL, 'c' },
         { "daemon", 0, NULL, 'd' },
+        { "verbose", 0, NULL, 'v' },
 
         { NULL, 0, NULL, 0 },
     };
 
-    int rc = 0;
-
     while (true) {
-        if ((rc = getopt_long(argc, argv, "dh", acd_options, NULL)) == -1) break;
+        if ((rc = getopt_long(argc, argv, "dvh", acd_options, NULL)) == -1) break;
 
         switch (rc) {
         case 0:
@@ -487,8 +483,11 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Try `--help' for more information.\n");
             return 1;
         case 'h':
-            fprintf(stdout, "%s [-d, --daemon]\n", argv[0]);
+            fprintf(stdout, "%s [-c, --config <file>] [-d, --daemon] [-v, --verbose]\n", argv[0]);
             return 0;
+        case 'c':
+            config_file = optarg;
+            break;
         case 'd':
             terminate = false;
             if (daemon(1, 1) != 0) {
@@ -496,8 +495,29 @@ int main(int argc, char *argv[])
                 return 1;
             }
             break;
+        case 'v':
+            acd_config.verbose = true;
+            break;
         }
     }
+
+    fprintf(stdout, "aconnectd v%s\n", PACKAGE_VERSION);
+
+    acd_config.Load(config_file);
+
+    snd_lib_error_set_handler(acd_error);
+
+    snd_seq_t *seq;
+    if (snd_seq_open(&seq, "default", SND_SEQ_OPEN_DUPLEX, 0) < 0)
+        return 1;
+
+    if (snd_seq_set_client_name(seq, "aconnectd") < 0) {
+        snd_seq_close(seq);
+        fprintf(stderr, "Error setting client name.\n");
+        return 1;
+    }
+
+    acd_config.my_id = snd_seq_client_id(seq);
 
     time_t last_refresh = 0;
 

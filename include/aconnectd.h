@@ -49,10 +49,12 @@ public:
 class acdConfig
 {
 public:
+    int my_id;
+    bool verbose;
     unsigned refresh_ttl;
     map<pair<string, string>, acdPatch> patches;
 
-    acdConfig() : refresh_ttl(30) { }
+    acdConfig() : my_id(-1), verbose(false), refresh_ttl(30) { }
 
     void Load(const string &filename);
 };
