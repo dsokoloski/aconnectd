@@ -1,6 +1,7 @@
 # AConnectD
 
 ALSA Sequencer Patch Manager
+
 Written by Darryl Sokoloski <darryl@sokoloski.ca>
 
 Licenced under the GPL version 3.
